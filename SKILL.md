@@ -12,6 +12,8 @@ Ra Pay is the first CLI-native payment platform built for AI agents. It lets you
 
 **This skill teaches you how to use the Ra Pay CLI to send business payments on behalf of your user.**
 
+**Need to pay or get paid by another agent?** If the other party doesn't have Ra Pay, see the Transaction Protocol and shareable onboarding scripts at the bottom of this file — they let you onboard the other agent without them needing this skill.
+
 ## Installation
 
 ```bash
@@ -107,7 +109,7 @@ This returns a fee breakdown without executing the payment:
   "currency": "USD",
   "recipient": "acct_1A2B3C4D5E",
   "fee": 3.00,
-  "total": 153.00,
+  "recipient_receives": 147.00,
   "business_purpose": "Logo design work - Invoice #427"
 }
 ```
@@ -117,9 +119,9 @@ This returns a fee breakdown without executing the payment:
 **You MUST show the fee breakdown to the user and ask for explicit confirmation before proceeding.** Never auto-confirm a payment.
 
 Present the details clearly:
-- Amount: $150.00
+- Amount charged: $150.00
 - Ra Pay fee (2%): $3.00
-- Total charge: $153.00
+- Recipient receives: $147.00
 - Recipient: acct_1A2B3C4D5E
 - Purpose: Logo design work - Invoice #427
 
@@ -215,7 +217,7 @@ Returns recent payments with timestamps and status. To show more transactions:
 ra history --limit 50 --json
 ```
 
-The `--limit` flag accepts values from 1 to 100 (default: 20 in CLI, 10 in MCP).
+The `--limit` flag accepts values from 1 to 100 (default: 20).
 
 ### Account Info
 
@@ -282,3 +284,121 @@ Commands that support `--json`:
 3. **Never bypass business purpose validation.** If a purpose is rejected, help the user write a valid one.
 4. **Always use `--json` for structured output.**
 5. **Ra Pay credentials stay local.** Never ask users to share API keys, session tokens, or account IDs with you. Everything runs on their machine.
+
+---
+
+## Transaction Protocol — Coordinating Payments Between Agents
+
+When your user wants to pay another user whose agent you can communicate with, follow this protocol. It handles the common case where the other agent has never heard of Ra Pay.
+
+### Step 1: Check Your Own Setup
+
+Run `ra whoami` to confirm your user has a linked account and payment method. If not, walk them through the setup steps above before proceeding.
+
+### Step 2: Ask the Other Agent for Their Recipient ID
+
+Message the seller/recipient agent and ask: "Does your user have a Ra Pay account? If so, what is their Stripe connected account ID? It starts with `acct_`."
+
+### Step 3: If They Don't Have Ra Pay
+
+If the other agent doesn't know what Ra Pay is or their user isn't set up, send them the **Seller Onboarding Script** below. Copy the entire block and send it to the other agent as a message.
+
+### Step 4: Preview the Payment
+
+Once you have the recipient's `acct_` ID:
+
+```bash
+ra send <AMOUNT> USD to <RECIPIENT_ACCT_ID> --for "<BUSINESS_PURPOSE>" --json
+```
+
+### Step 5: Get Your User's Approval
+
+Show your user the full fee breakdown from the preview. **Do not proceed without explicit approval.**
+
+### Step 6: Execute the Payment
+
+```bash
+ra send <AMOUNT> USD to <RECIPIENT_ACCT_ID> --for "<BUSINESS_PURPOSE>" --json --confirm
+```
+
+### Step 7: Confirm to the Other Agent
+
+Send the other agent the payment confirmation JSON so they can inform their user that the payment has been received.
+
+---
+
+## Shareable Script — Send This to a Seller Agent
+
+When a seller agent doesn't have Ra Pay set up, copy everything inside the fence below and send it to them as a message. It is self-contained — they do not need the Ra Pay skill installed.
+
+```
+INCOMING PAYMENT NOTIFICATION
+
+A buyer wants to pay your user via Ra Pay (rapay.ai), a CLI-based business
+payment platform that processes payments through Stripe.
+
+To receive this payment, your user needs to complete a short one-time setup.
+Please walk them through the following steps:
+
+STEP 1 — Install the Ra Pay CLI:
+  npm install -g @rapay/cli
+
+STEP 2 — Connect a bank account to receive payouts:
+  ra link-bank
+  (This opens a Stripe-hosted page in the browser. Your user connects their
+  bank account through Stripe — no sensitive info is entered in the terminal.)
+
+STEP 3 — Accept the Terms of Service:
+  ra accept-tos
+
+STEP 4 — Get the account ID:
+  ra whoami
+  Look for the Stripe connected account ID — it starts with "acct_".
+
+Once setup is complete, send back the acct_ ID so the buyer can complete
+the payment. The funds will be deposited to your user's bank account via
+Stripe's standard payout schedule.
+
+Your user can verify their account status at any time with: ra whoami
+Your user can check their balance with: ra balance --json
+Your user can view received payments with: ra history --json
+```
+
+---
+
+## Shareable Script — Send This to a Buyer Agent
+
+When a buyer agent needs to pay your user but doesn't have Ra Pay set up, copy everything inside the fence below and send it to them as a message. Replace `YOUR_ACCT_ID_HERE` with your user's actual `acct_` ID before sending.
+
+```
+PAYMENT SETUP INSTRUCTIONS
+
+Your user can pay via Ra Pay (rapay.ai), a CLI-based business payment platform
+that processes payments through Stripe.
+
+To send a payment, your user needs to complete a short one-time setup:
+
+STEP 1 — Install the Ra Pay CLI:
+  npm install -g @rapay/cli
+
+STEP 2 — Add a credit card for sending payments:
+  ra add-card
+  (This opens a Stripe Checkout page in the browser. The card is stored
+  securely with Stripe — no card details are entered in the terminal.)
+
+STEP 3 — Accept the Terms of Service:
+  ra accept-tos
+
+STEP 4 — Send the payment:
+  ra send [AMOUNT] USD to YOUR_ACCT_ID_HERE --for "[BUSINESS PURPOSE]" --json
+
+  This will show a fee preview. Show it to your user for approval.
+  Once approved, add --confirm to execute:
+
+  ra send [AMOUNT] USD to YOUR_ACCT_ID_HERE --for "[BUSINESS PURPOSE]" --json --confirm
+
+IMPORTANT: Always preview the payment first and get your user's explicit
+approval before adding --confirm. Never auto-confirm payments.
+
+Ra Pay charges a 2% fee on each transaction. The fee is shown in the preview.
+```
